@@ -60,7 +60,213 @@
 
     <p>⚠️ حتماً پس از ثبت‌نام به مالک پیام بدهید و کد بازیکن خود را ارسال کنید.</p>
 
-    <button class="btn" onclick="alert('برای ادامه به ربات بازگردید.')">بازگشت به ربات</button>
-  </div>
+    <button class="btn" onclick="alert('برای ادامه به ربات بازگردید.')">بازگشت 
+      📁 پروژه: Squid Game Web App (نسخه واقعی + دیتابیس)
+
+
+---
+
+✅ فایل 1: app.py (کد اصلی اجرای سایت با Flask)
+
+from flask import Flask, render_template, request, redirect, url_for, session
+import sqlite3
+import datetime
+
+app = Flask(__name__)
+app.secret_key = 'squid_secret_key'
+
+
+def get_db():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        telegram = request.form['telegram']
+
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO players (name, telegram, approved) VALUES (?, ?, ?)", (name, telegram, 0))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('index'))
+
+    return render_template('register.html')
+
+@app.route('/commander')
+def commander():
+    if 'admin' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    players = conn.execute('SELECT * FROM players').fetchall()
+    return render_template('commander.html', players=players)
+
+@app.route('/approve/<int:id>')
+def approve(id):
+    if 'admin' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    conn.execute('UPDATE players SET approved = 1 WHERE id = ?', (id,))
+    conn.commit()
+    return redirect(url_for('commander'))
+
+@app.route('/delete/<int:id>')
+def delete(id):
+    if 'admin' not in session:
+        return redirect(url_for('login'))
+    conn = get_db()
+    conn.execute('DELETE FROM players WHERE id = ?', (id,))
+    conn.commit()
+    return redirect(url_for('commander'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form['password']
+        if password == 'kingbadadmin':
+            session['admin'] = True
+            return redirect(url_for('commander'))
+        else:
+            return 'رمز اشتباه است'
+    return render_template('admin.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+---
+
+✅ فایل 2: templates/index.html (صفحه اصلی سایت)
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>بازی اسکوید گیم</title>
+</head>
+<body>
+    <h1>🎮 خوش آمدید به بازی اسکوید گیم</h1>
+    <p>آیا آماده‌اید برای 500 استارزی؟</p>
+    <a href="/register">ثبت‌نام بازیکن</a>
+    <br>
+    <a href="/login">ورود فرمانده</a>
 </body>
-  </html>
+</html>
+
+
+---
+
+✅ فایل 3: templates/register.html (فرم ثبت‌نام بازیکن)
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>ثبت‌نام</title>
+</head>
+<body>
+    <h2>فرم ثبت‌نام بازیکن</h2>
+    <form method="POST">
+        نام: <input name="name" required><br>
+        آیدی تلگرام: <input name="telegram" required><br>
+        <button type="submit">ارسال</button>
+    </form>
+</body>
+</html>
+
+
+---
+
+✅ فایل 4: templates/admin.html (ورود فرمانده)
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>ورود فرمانده</title>
+</head>
+<body>
+    <h2>ورود فرمانده</h2>
+    <form method="POST">
+        رمز عبور: <input type="password" name="password" required><br>
+        <button type="submit">ورود</button>
+    </form>
+</body>
+</html>
+
+
+---
+
+✅ فایل 5: templates/commander.html (اتاق فرمانده)
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>اتاق فرمانده</title>
+</head>
+<body>
+    <h2>اتاق فرمانده - مدیریت بازیکنان</h2>
+    <table border="1">
+        <tr><th>نام</th><th>آیدی</th><th>تایید</th><th>حذف</th></tr>
+        {% for player in players %}
+        <tr>
+            <td>{{ player.name }}</td>
+            <td>@{{ player.telegram }}</td>
+            <td>
+                {% if player.approved == 0 %}
+                <a href="/approve/{{ player.id }}">تایید</a>
+                {% else %}✅{% endif %}
+            </td>
+            <td><a href="/delete/{{ player.id }}">❌ حذف</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/logout">خروج</a>
+</body>
+</html>
+
+
+---
+
+✅ فایل 6: requirements.txt
+
+flask
+
+
+---
+
+✅ دیتابیس SQLite (ایجاد با Python):
+
+# فایل مجزا برای ساخت دیتابیس (ساخت یک بار کافی است)
+import sqlite3
+conn = sqlite3.connect('database.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    telegram TEXT,
+    approved INTEGER
+)''')
+conn.commit()
+conn.close()
+
+
+---
+
+اگر خواستی نسخه جنگی + تایمر + انیمیشن هم اضافه کنم، فقط بگو "نسخه انیمیشنی بازی شیشه‌ای رو هم می‌خوام" ✅
+
+  
